@@ -1,100 +1,139 @@
 import sys
 import pandas as pd
 import numpy as np
+import auto_diff as auto_diff
 import sklearn
-
-
-class ActivationFunction:
-    CHOICES = ['tanh', 'sigmoid', 'relu', 'identity']
-    function = None
-    output = None
-
-    def __init__(self, x, name=CHOICES[0]):
-        self.function = getattr(np, name, None)
-        if self.function is None:
-            self.function = getattr(self, name, None)
-        self.output = self.function(x)
-
-    @staticmethod
-    def identity(x, *args, **kwargs):
-        return x
-
-
-class BaseLayer:
-    nr_neurons = 0
-    sample_size = 0
-    data = np.matrix(0)
-    activation_type = 'identity'
-    prev_layer = None
-    activation_function = None
-    out = None
-
-    def __init__(self, nr_neurons, sample_size, data, prev_layer=None, activation_type='identity'):
-        self.nr_neurons = nr_neurons
-        self.sample_size = sample_size
-        self.data = data
-        self.prev_layer = prev_layer
-        self.activation_type = activation_type
-
-    def output(self):
-        if not self.prev_layer:
-            return self.data
-        self.out = ActivationFunction(np.matmul(self.prev_layer.output(), self.data), self.activation_type).output
-        return self.out
-
-
-class InputLayer(BaseLayer):
-
-    def __init__(self, data_x):
-        nr_of_rows, nr_of_features = pd.DataFrame(data_x).shape
-        BaseLayer.__init__(self, nr_of_features, nr_of_rows, data_x)
-
-
-class HiddenLayer(BaseLayer):
-    init_type = ['random']
-
-    def __init__(self, size, prev_layer, init_type='random'):
-        data = getattr(self, f'{init_type}_init')(prev_layer.nr_neurons, size)
-        BaseLayer.__init__(self, size, prev_layer.nr_neurons, data, prev_layer, 'tanh')
-
-    def random_init(self, size, nr_neurons):
-        return np.random.rand(size, nr_neurons)
-
-
-class OutputLayer(HiddenLayer):
-
-    def __init__(self, data_y, prev_layer):
-        nr_of_rows, nr_of_features = pd.DataFrame(data_y).shape
-        HiddenLayer.__init__(self, nr_of_features, prev_layer)
+from sympy import *
+from scipy.stats import truncnorm
+from layers import BaseLayer, InputLayer, OutputLayer, HiddenLayer
+from activations import CostFunction
 
 
 class Network:
-    input_data = None
-    output_data = None
-    crt_layer = None
-    layers = []
 
-    def __init__(self, x, y):
-        self.input_data = x
-        self.output_data = y
+    def __init__(self,
+                 input_data=None,
+                 output_data=None,
+                 crt_layer=None,
+                 learning_rate=0.1,
+                 layers=[],
+                 bias=False,
+                 cost_function='sse',
+                 shape_in=None
+                 ):
+        self.input_data = input_data
+        self.output_data = output_data
+        self.crt_layer = crt_layer
+        self.learning_rate = learning_rate
+        self.layers = layers
+        self.bias = bias
+        self.network_out = None
+        self.cost_function = cost_function
+        self.grad = {}
+        self.shape_in = shape_in
+        return
 
-    def init_network(self):
-        layer_in = InputLayer(self.input_data)
+    def init_network(self, activation_in='relu'):
+        layer_in = InputLayer(self.input_data, self.bias, self.shape_in, activation_in)
         self.crt_layer = layer_in
         self.layers.append(layer_in)
         return self
 
-    def add_layer(self, size=2, init_type='random', type_layer='Hidden'):
-        layer = getattr(sys.modules[__name__], f'{type_layer}Layer')(size, self.crt_layer, init_type)
+    def add_layer(self, size=2, init_type='random', type_layer='Hidden', activation='relu'):
+        layer = getattr(sys.modules[__name__], f'{type_layer}Layer')(size, self.crt_layer, activation, init_type, self.bias)
+        self.crt_layer.next_layer = layer
         self.crt_layer = layer
         self.layers.append(layer)
+
         return self
 
-    def run(self):
-        layer_out = OutputLayer(self.output_data, self.crt_layer)
+    def add_output(self, target_shape, activation='sigmoid', cost_function='sse', init_type='random'):
+        layer_out = OutputLayer(
+            None,
+            self.crt_layer, self.bias,
+            shape=target_shape,
+            activation=activation,
+            cost_function=cost_function
+        )
+        self.crt_layer.next_layer = layer_out
         self.crt_layer = layer_out
         self.layers.append(layer_out)
-        return self.crt_layer.output()
+        self.cost_function = cost_function
+        return self
+
+    def calculate_errors(self, computed):
+        return self.output_data - computed
+
+    def chain_rule(self):
+        cost = CostFunction(self.network_out, self.output_data, name=self.cost_function)
+        errors = [eval(cost.derivative_cost) for (predicted, target) in zip(self.network_out, self.output_data)]
+        self.grad['error'] = {'out': errors}
+
+    def run_batch(self, data, targets, batch_size=1, eval=False):
+        batches_input = np.split(data, batch_size)
+        targets_input = np.split(targets, batch_size)
+        out_net = []
+        i = 0
+        for (batch_in, target_in) in zip(batches_input, targets_input):
+            if i % 100 == 0:
+                print(f'samp:{i}')
+            if eval:
+                out = self.run_forward(batch_in, target_in)
+                out_net.append(out)
+            else:
+                self.train(batch_in, target_in)
+            i += 1
+        return out_net
+
+    def run_forward(self, data_x, target):
+        self.layers[0].data = data_x
+        self.layers[len(self.layers)-1].target_values = target
+
+        network_output = self.crt_layer.compute_forward_pass()
+        return network_output
+
+    def train(self, data_x, target, learning_rate=0.001):
+        self.run_forward(data_x, target)
+        self.crt_layer.compute_backward_pass(learning_rate)
+        return
+
+    def train_network(self, data_train, targets_train,
+                      data_test, targets_test,
+                      batch_size=1, nr_epochs=10,
+                      online=True
+                      ):
+        for epoch in range(nr_epochs):
+            print("epoch: ", epoch)
+            batch_size_train = batch_size
+            if online:
+                batch_size_train = len(data_train)
+            self.run_batch(data_train, targets_train, batch_size_train)
+            for lay in self.layers:
+                print('-----')
+                print(lay.crt_err_gradient)
+                print('-----')
+            print(self.layers[len(self.layers)-1].out)
+            print("Eval-train")
+            corrects, wrongs = self.evaluate(data_train, targets_train)
+            print("accuracy train: ", (corrects / (corrects + wrongs))*100)
+            print("Eval-test")
+            corrects, wrongs = self.evaluate(data_test, targets_test)
+            print("accuracy: test", (corrects / (corrects + wrongs))*100)
+
+    def evaluate(self, test_input, test_output):
+        out = self.run_batch(test_input, test_output, batch_size=len(test_input), eval=True)
+        corrects, wrongs = 0, 0
+        for i in range(len(test_output)):
+            res_max = out[i].argmax()
+            res_max_target = test_output[i].argmax()
+            if res_max == res_max_target:
+                corrects += 1
+            else:
+                wrongs += 1
+
+        return corrects, wrongs
+
+
 
 
 
