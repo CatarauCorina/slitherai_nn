@@ -65,11 +65,18 @@ class BaseLayer:
             errors = [eval(cost.derivative_cost) for (predicted, target) in zip(self.out, self.target_values)]
         return np.array(errors, ndmin=2)
 
-    def update_weights(self, learning_rate=0.001):
+    def update_weights(self, learning_rate=0.0001):
         self.data = self.data - learning_rate*self.crt_err_gradient
         if self.bias_gradient is not None:
             self.bias_data = self.bias_data - learning_rate*self.bias_gradient
         return
+
+    def compute_bias_gradient(self, error_gradient):
+        shape_grad = error_gradient.shape
+        if shape_grad[0] > 0:
+            bias_gradient = np.mean(error_gradient, axis=0, keepdims=True)
+            return bias_gradient
+        return error_gradient
 
     def compute_backward_pass(self, learning_rate=0.01):
         if self.activation_type == 'softmax':
@@ -89,14 +96,14 @@ class BaseLayer:
             self.prev_layer.compute_backward_pass()
         elif self.prev_layer is not None and self.prev_layer.prev_layer is not None:
             error_gradient_hidden = self.next_layer.chain_gradient * derivative_output
-            self.bias_gradient = error_gradient_hidden
+            self.bias_gradient = self.compute_bias_gradient(error_gradient_hidden)
             self.crt_err_gradient = np.dot(error_gradient_hidden.T, self.prev_layer.out)
             self.chain_gradient = np.dot(error_gradient_hidden, self.data)
             self.update_weights(learning_rate)
             self.prev_layer.compute_backward_pass()
         elif self.prev_layer.prev_layer is None:
             error_gradient_hidden = self.next_layer.chain_gradient * derivative_output
-            self.bias_gradient = error_gradient_hidden
+            self.bias_gradient = self.compute_bias_gradient(error_gradient_hidden)
             self.crt_err_gradient = np.dot(error_gradient_hidden.T, self.prev_layer.out)
             self.update_weights(learning_rate)
             self.chain_gradient = error_gradient_hidden

@@ -129,7 +129,7 @@ def run_mnist_test():
 
     mnist_x_train, mnist_y_train, mnist_x_test, mnist_y_test = load_mnist_keras()
     neural_network_mnist = nn.Network(bias=True, shape_in=pd.DataFrame(mnist_x_train).shape).init_network() \
-        .add_layer(32, activation='sigmoid') \
+        .add_layer(32, activation='relu') \
         .add_output(mnist_y_train.shape, 'softmax', 'categorical_cross_entropy')
     neural_network_mnist.train_network(mnist_x_train,
                                        mnist_y_train,

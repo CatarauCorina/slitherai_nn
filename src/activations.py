@@ -35,7 +35,7 @@ class ActivationFunction:
         if nr_values == 1:
             softmax_sample = self.softmax_sample(x_arr)
             output = np.array(
-                softmax_sample,
+                softmax_sample['out'],
                 ndmin=2
             ).reshape(x_arr.shape)
             self.output = output
