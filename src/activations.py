@@ -130,8 +130,6 @@ class CostFunction:
         prod_target_predicted = [auto_diff.Mul(ti, log_pred_i) for ti, log_pred_i in zip(target_var, log_predicted_var)]
         sum_ce = reduce(lambda x, y: auto_diff.Add(x, y), prod_target_predicted)
         sum_ce = auto_diff.Mul(auto_diff.Constant(-1), sum_ce)
-        cost = np.array([sum_ce.gradient(pred_var).eval() for pred_var in predicted_var]).reshape(
-            predicted.shape
-        )
+        cost = predicted - target
 
         return {'error': sum_ce.eval(), 'derivative_error': cost}

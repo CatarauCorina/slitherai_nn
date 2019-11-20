@@ -134,8 +134,8 @@ def run_mnist_test():
     neural_network_mnist.train_network(mnist_x_train,
                                        mnist_y_train,
                                        mnist_x_test, mnist_y_test,
-                                       online=False,
-                                       nr_epochs=1, batch_size=100)
+                                       online=True,
+                                       nr_epochs=1, batch_size=len(mnist_x_train))
     return
 
 
