@@ -6,6 +6,7 @@ import sklearn.datasets as ds
 from slitherai_nn.src import nn as nn
 from slitherai_nn.src import lab_nn as ln
 from sklearn.model_selection import train_test_split
+import data_preproc as dp
 
 
 def dummy_data():
@@ -139,6 +140,23 @@ def run_mnist_test():
     return
 
 
+def run_svhn_test():
+   data_loader = dp.DataLoader()
+
+   neural_network_svhn = nn.Network(bias=True, shape_in=pd.DataFrame(data_loader.train_x).shape).init_network() \
+       .add_layer(100, activation='sigmoid') \
+       .add_layer(32 , activation='sigmoid') \
+       .add_output(data_loader.train_y.shape, 'softmax', 'categorical_cross_entropy')
+   neural_network_svhn.train_network(data_loader.train_x,
+                                     data_loader.train_y,
+                                     data_loader.test_x, data_loader.test_y,
+                                     online=False,
+                                     nr_epochs=1, batch_size=1000)
+   return
+
+
+
+
 def run_compute_check():
     x = [[1, 2, 3], [1, 1, 1]]
     x_arr = np.array(x, ndmin=2)
@@ -160,9 +178,10 @@ def run_compute_check():
 
 
 def main():
-    run_mnist_test()
+    #run_mnist_test()
     #run_iris_test()
     #run_compute_check()
+    run_svhn_test()
 
 
 if __name__ == '__main__':

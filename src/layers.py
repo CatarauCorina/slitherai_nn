@@ -94,9 +94,9 @@ class BaseLayer:
             self.chain_gradient = np.dot(error_gradient_out, self.data)
             self.update_weights(learning_rate)
             self.prev_layer.compute_backward_pass()
-            print('--------')
-            print(self.crt_err_gradient)
-            print('--------')
+            # print('--------')
+            # print(self.crt_err_gradient)
+            # print('--------')
         elif self.prev_layer is not None and self.prev_layer.prev_layer is not None:
             error_gradient_hidden = self.next_layer.chain_gradient * derivative_output
             self.bias_gradient = self.compute_bias_gradient(error_gradient_hidden)
@@ -104,18 +104,18 @@ class BaseLayer:
             self.chain_gradient = np.dot(error_gradient_hidden, self.data)
             self.update_weights(learning_rate)
             self.prev_layer.compute_backward_pass()
-            print('--------')
-            print(self.crt_err_gradient)
-            print('--------')
+            # print('--------')
+            # print(self.crt_err_gradient)
+            # print('--------')
         elif self.prev_layer.prev_layer is None:
             error_gradient_hidden = self.next_layer.chain_gradient * derivative_output
             self.bias_gradient = self.compute_bias_gradient(error_gradient_hidden)
             self.crt_err_gradient = np.dot(error_gradient_hidden.T, self.prev_layer.out)
             self.update_weights(learning_rate)
             self.chain_gradient = error_gradient_hidden
-            print('--------')
-            print(self.crt_err_gradient)
-            print('--------')
+            # print('--------')
+            # print(self.crt_err_gradient)
+            # print('--------')
         else:
             return self.data
 

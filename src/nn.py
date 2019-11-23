@@ -70,8 +70,8 @@ class Network:
         self.grad['error'] = {'out': errors}
 
     def run_batch(self, data, targets, batch_size=1, eval=False):
-        batches_input = np.split(data, batch_size)
-        targets_input = np.split(targets, batch_size)
+        batches_input = np.array_split(data, batch_size)
+        targets_input = np.array_split(targets, batch_size)
         out_net = []
         i = 0
         for (batch_in, target_in) in zip(batches_input, targets_input):
