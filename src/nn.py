@@ -19,7 +19,8 @@ class Network:
                  layers=[],
                  bias=False,
                  cost_function='sse',
-                 shape_in=None
+                 shape_in=None,
+                 regularization=None,
                  ):
         self.input_data = input_data
         self.output_data = output_data
@@ -31,29 +32,46 @@ class Network:
         self.cost_function = cost_function
         self.grad = {}
         self.shape_in = shape_in
+        self.regularization = regularization
         return
 
-    def init_network(self, activation_in='relu'):
-        layer_in = InputLayer(self.input_data, self.bias, self.shape_in, activation_in)
+    def init_network(self, activation_in='relu', alpha_regularization=0):
+        layer_in = InputLayer(self.input_data, self.bias, self.shape_in, activation_in,
+                              alpha_regularization,
+                              regularization_type=self.regularization)
         self.crt_layer = layer_in
         self.layers.append(layer_in)
         return self
 
-    def add_layer(self, size=2, init_type='random', type_layer='Hidden', activation='relu'):
-        layer = getattr(sys.modules[__name__], f'{type_layer}Layer')(size, self.crt_layer, activation, init_type, self.bias)
+    def add_layer(self, size=2, init_type='random', type_layer='Hidden', activation='relu',
+                  alpha_regularization=0, layer=None):
+        if layer is None:
+            layer = getattr(sys.modules[__name__], f'{type_layer}Layer')(size, self.crt_layer,
+                                                                         activation,
+                                                                         init_type,
+                                                                         self.bias,
+                                                                         regularization_type=self.regularization,
+                                                                         alpha_regularization=alpha_regularization)
+        else:
+            layer.prev_layer = self.crt_layer
         self.crt_layer.next_layer = layer
         self.crt_layer = layer
         self.layers.append(layer)
 
         return self
 
-    def add_output(self, target_shape, activation='sigmoid', cost_function='sse', init_type='random'):
+    def add_output(self, target_shape, activation='sigmoid',
+                   cost_function='sse',
+                   init_type='random',
+                   alpha_regularization=0):
         layer_out = OutputLayer(
             None,
             self.crt_layer, self.bias,
             shape=target_shape,
             activation=activation,
-            cost_function=cost_function
+            cost_function=cost_function,
+            regularization_type=self.regularization,
+            alpha_regularization=alpha_regularization
         )
         self.crt_layer.next_layer = layer_out
         self.crt_layer = layer_out

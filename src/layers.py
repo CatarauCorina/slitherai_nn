@@ -19,7 +19,9 @@ class BaseLayer:
                  bias=False,
                  bias_data=None,
                  output_layer=False,
-                 next_layer=None
+                 next_layer=None,
+                 regularization_type=None,
+                 alpha_regularization=0
                  ):
         self.nr_neurons = nr_neurons
         self.sample_size = sample_size
@@ -36,6 +38,8 @@ class BaseLayer:
         self.chain_gradient = None
         self.bias_gradient = None
         self.next_layer = next_layer
+        self.regularization_type = regularization_type
+        self.alpha_regularization = alpha_regularization
         return
 
     def compute_forward_pass(self):
@@ -65,8 +69,15 @@ class BaseLayer:
             errors = [eval(cost.derivative_cost) for (predicted, target) in zip(self.out, self.target_values)]
         return np.array(errors, ndmin=2)
 
+    def get_regularization_term(self, learning_rate):
+        if self.regularization_type == 'L1':
+            return learning_rate*self.alpha_regularization*np.sign(self.data)
+        if self.regularization_type == 'L2':
+            return learning_rate*self.alpha_regularization*self.data
+        return 0
+
     def update_weights(self, learning_rate=0.0001):
-        self.data = self.data - learning_rate*self.crt_err_gradient
+        self.data = self.data - (self.get_regularization_term(learning_rate)) - learning_rate*self.crt_err_gradient
         if self.bias_gradient is not None:
             self.bias_data = self.bias_data - learning_rate*self.bias_gradient
         return
@@ -122,22 +133,39 @@ class BaseLayer:
 
 class InputLayer(BaseLayer):
 
-    def __init__(self, data_x, bias, shape=None, activation_func='relu'):
+    def __init__(self, data_x, bias, shape=None, activation_func='relu', alpha_regularization=0, regularization_type=None):
         if data_x is None:
             nr_of_rows, nr_of_features = shape
-            BaseLayer.__init__(self, nr_of_features, nr_of_rows, bias=bias, activation_type=activation_func)
+            BaseLayer.__init__(self, nr_of_features, nr_of_rows,
+                               bias=bias,
+                               activation_type=activation_func,
+                               regularization_type=regularization_type,
+                               alpha_regularization=alpha_regularization)
         else:
             nr_of_rows, nr_of_features = pd.DataFrame(data_x).shape
-            BaseLayer.__init__(self, nr_of_features, nr_of_rows, data_x, bias=bias, activation_type=activation_func)
+            BaseLayer.__init__(self, nr_of_features, nr_of_rows, data_x,
+                               bias=bias,
+                               activation_type=activation_func,
+                               regularization_type=regularization_type,
+                               alpha_regularization=alpha_regularization)
         return
 
 
 class HiddenLayer(BaseLayer):
     init_type = ['random']
 
-    def __init__(self, size, prev_layer, activation, init_type='debug', bias=True, output_layer=False):
+    def __init__(self, size, prev_layer, activation, init_type='debug', bias=True,
+                 output_layer=False,
+                 regularization_type=None,
+                 alpha_regularization=0):
         data = getattr(self, f'{init_type}_init')(prev_layer.nr_neurons, size)
-        BaseLayer.__init__(self, size, prev_layer.nr_neurons, data, prev_layer, activation_type=activation, output_layer=output_layer)
+        BaseLayer.__init__(self, size,
+                           prev_layer.nr_neurons,
+                           data, prev_layer,
+                           activation_type=activation,
+                           output_layer=output_layer,
+                           regularization_type=regularization_type,
+                           alpha_regularization=alpha_regularization)
         if bias:
             self.bias_data = self.bias_init()
 
@@ -172,15 +200,53 @@ class HiddenLayer(BaseLayer):
 class OutputLayer(HiddenLayer):
     target_values = None
 
-    def __init__(self, data_y, prev_layer, bias, shape=None, activation='relu', cost_function='sse', init_type='random'):
+    def __init__(self, data_y, prev_layer, bias, shape=None, activation='relu', cost_function='sse',
+                 init_type='random',
+                 regularization_type=None,
+                 alpha_regularization=0):
         if data_y is None:
             nr_of_rows, nr_of_features = shape
             self.cost_function = cost_function
-            HiddenLayer.__init__(self, nr_of_features, prev_layer, bias=bias, activation=activation, output_layer=True, init_type=init_type)
+            HiddenLayer.__init__(self, nr_of_features,
+                                 prev_layer,
+                                 bias=bias,
+                                 activation=activation,
+                                 output_layer=True,
+                                 init_type=init_type,
+                                 regularization_type=regularization_type,
+                                 alpha_regularization=alpha_regularization)
         else:
             nr_of_rows, nr_of_features = pd.DataFrame(data_y).shape
             self.cost_function = cost_function
-            HiddenLayer.__init__(self, nr_of_features, prev_layer, bias=bias, activation=activation, output_layer=True, init_type=init_type)
+            HiddenLayer.__init__(self,
+                                 nr_of_features,
+                                 prev_layer,
+                                 bias=bias,
+                                 activation=activation,
+                                 output_layer=True,
+                                 init_type=init_type,
+                                 regularization_type=regularization_type,
+                                 alpha_regularization=alpha_regularization)
 
         self.next_layer = None
+        return
+
+
+class DropoutLayer(BaseLayer):
+
+    def __init__(self, dropout_prob=0.5, nr_neurons=0):
+        BaseLayer.__init__(self, nr_neurons=nr_neurons)
+        self.dropout_prob = dropout_prob
+        self.mask_dropout = None
+        return
+
+    def compute_forward_pass(self):
+        self.mask_dropout = np.random.binomial(1, self.dropout_prob, size=(1, self.prev_layer.nr_neurons))/self.dropout_prob
+        # self.mask_dropout = np.random.randn(1, self.prev_layer.nr_neurons) < self.dropout_prob
+        self.out = self.prev_layer.compute_forward_pass() * self.mask_dropout
+        return self.out
+
+    def compute_backward_pass(self):
+        self.chain_gradient = self.next_layer.chain_gradient * self.mask_dropout
+        self.prev_layer.compute_backward_pass()
         return

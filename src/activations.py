@@ -103,7 +103,7 @@ class CostFunction:
         return
 
     def sse(self, predicted, target):
-        self.derivative_cost = f'target-predicted'
+        self.derivative_cost = f'predicted-target'
         return 1/2*np.sum((target-predicted)**2)
 
     def categorical_cross_entropy(self, predicted, target):
