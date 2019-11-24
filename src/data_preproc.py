@@ -17,19 +17,24 @@ class DataLoader:
         gray_images = [cv2.cvtColor(img_color, cv2.COLOR_BGR2GRAY) for img_color in imgs_color]
         return np.array(gray_images)
 
+    def normalize(self, imgs_color):
+        normalized_images = [(img-np.mean(img))/np.std(img) for img in imgs_color]
+        return np.array(normalized_images)
+
     def load_svhn_data(self):
-        train = loadmat('./src/data/train_32x32.mat')
-        test = loadmat('./src/data/test_32x32.mat')
+        train = loadmat('./data/train_32x32.mat')
+        test = loadmat('./data/test_32x32.mat')
         d1_train, d2_train, d3_train, d4_train = train['X'].shape
         d1_test, d2_test, d3_test, d4_test = test['X'].shape
         train_x = np.reshape(train['X'], (d4_train, d1_train, d2_train, d3_train))
         test_x = np.reshape(test['X'], (d4_test, d1_test, d2_test, d3_test))
         gray_scale_x_train = self.to_grayscale(train_x)
         gray_scale_x_test = self.to_grayscale(test_x)
-        x_data_reshaped = gray_scale_x_train.reshape((d4_train, d1_train * d2_train))
-        x_test_reshaped = gray_scale_x_test.reshape((d4_test, d1_test * d2_test))
-        x_data_reshaped = x_data_reshaped/255
-        x_test_reshaped = x_test_reshaped/255
+        normalized_x_train = self.normalize(gray_scale_x_train)
+        normalized_x_test = self.normalize(gray_scale_x_test)
+        x_data_reshaped = normalized_x_train.reshape((d4_train, d1_train * d2_train))
+        x_test_reshaped = normalized_x_test.reshape((d4_test, d1_test * d2_test))
+
         y_train = tf.keras.utils.to_categorical(train['y'])
         y_test = tf.keras.utils.to_categorical(test['y'])
         return x_data_reshaped, \

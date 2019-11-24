@@ -1,6 +1,7 @@
 import os
 import numpy as np
 import tensorflow as tf
+import data_preproc as dp
 from tensorflow import keras as ks
 
 
@@ -21,6 +22,35 @@ def construct_net(input_shape, output_shape):
     # model.add(ks.layers.Dense(units=output_shape, activation='softmax'))
     return model
 
+
+def construct_net_svhn(input_shape, output_shape):
+    model = ks.Sequential()
+
+    model.add(ks.layers.Dense(4096, input_dim=input_shape, activation='relu'))
+    model.add(ks.layers.Dropout(rate=0.9))
+    model.add(ks.layers.Dense(4096, activation='relu'))
+    model.add(ks.layers.Dropout(rate=0.9))
+    model.add(ks.layers.Dense(3072,  activation='relu'))
+    model.add(ks.layers.Dropout(rate=0.5))
+    model.add(ks.layers.Dense(2048, activation='relu'))
+    model.add(ks.layers.Dropout(rate=0.5))
+
+    model.add(ks.layers.Dense(output_shape, activation='softmax'))
+
+    return model
+
+
+def run_svhn_test():
+    data_loader = dp.DataLoader()
+    model_net = construct_net_svhn(data_loader.train_x.shape[1], data_loader.train_y.shape[1])
+    sgd = tf.keras.optimizers.SGD(lr=0.1)
+    model_net.compile(optimizer='sgd', loss='categorical_crossentropy', metrics=['accuracy'])
+    history = model_net.fit(data_loader.train_x, data_loader.train_y, epochs=10, verbose=True)
+    loss, accuracy = model_net.evaluate(data_loader.test_x, data_loader.test_y, verbose=False)
+    model_net.summary()
+    print(loss)
+    print(accuracy)
+    return
 
 def one_hot(y):
     unique_val = np.unique(y)
@@ -118,8 +148,9 @@ def run_mnist_test_keras():
     return
 
 def main():
-    run_mnist_test_keras()
+    #run_mnist_test_keras()
     #run_iris_test_keras()
+    run_svhn_test()
 
 
 

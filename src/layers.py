@@ -241,9 +241,9 @@ class DropoutLayer(BaseLayer):
         return
 
     def compute_forward_pass(self):
-        self.mask_dropout = np.random.binomial(1, self.dropout_prob, size=(1, self.prev_layer.nr_neurons))/self.dropout_prob
-        # self.mask_dropout = np.random.randn(1, self.prev_layer.nr_neurons) < self.dropout_prob
-        self.out = self.prev_layer.compute_forward_pass() * self.mask_dropout
+        prev_out = self.prev_layer.compute_forward_pass()
+        self.mask_dropout = np.random.binomial(1, self.dropout_prob, size=prev_out.shape)/self.dropout_prob
+        self.out = prev_out * self.mask_dropout
         return self.out
 
     def compute_backward_pass(self):
