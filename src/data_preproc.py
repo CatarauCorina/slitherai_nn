@@ -3,6 +3,7 @@ import numpy as np
 from scipy.io import loadmat
 import tensorflow as tf
 import skimage
+import scipy.io
 import cv2
 
 
@@ -17,28 +18,42 @@ class DataLoader:
         gray_images = [cv2.cvtColor(img_color, cv2.COLOR_BGR2GRAY) for img_color in imgs_color]
         return np.array(gray_images)
 
+    def transform_label_10_to_0(self, data):
+        out = np.array(data).flatten()
+        out = np.where(out == 10, 0, out)
+        return out
+
     def normalize(self, imgs_color):
-        normalized_images = [(img-np.mean(img))/np.std(img) for img in imgs_color]
+        normalized_images = [(img - img.mean(axis=0))/img.std(axis=0) for img in imgs_color]
         return np.array(normalized_images)
 
     def load_svhn_data(self):
-        train = loadmat('./data/train_32x32.mat')
-        test = loadmat('./data/test_32x32.mat')
-        d1_train, d2_train, d3_train, d4_train = train['X'].shape
-        d1_test, d2_test, d3_test, d4_test = test['X'].shape
-        train_x = np.reshape(train['X'], (d4_train, d1_train, d2_train, d3_train))
-        test_x = np.reshape(test['X'], (d4_test, d1_test, d2_test, d3_test))
-        gray_scale_x_train = self.to_grayscale(train_x)
-        gray_scale_x_test = self.to_grayscale(test_x)
-        normalized_x_train = self.normalize(gray_scale_x_train)
-        normalized_x_test = self.normalize(gray_scale_x_test)
-        x_data_reshaped = normalized_x_train.reshape((d4_train, d1_train * d2_train))
-        x_test_reshaped = normalized_x_test.reshape((d4_test, d1_test * d2_test))
+        train = scipy.io.loadmat('./src/data/train_32x32.mat')
+        test = scipy.io.loadmat('./src/data/test_32x32.mat')
+        train_x = np.moveaxis(train['X'], -1, 0)
+        test_x = np.moveaxis(test['X'], -1, 0)
+        d1_train, d2_train, d3_train, d4_train = train_x.shape
+        d1_test, d2_test, d3_test, d4_test = test_x.shape
 
-        y_train = tf.keras.utils.to_categorical(train['y'])
-        y_test = tf.keras.utils.to_categorical(test['y'])
-        return x_data_reshaped, \
+        nr_samples_train = d1_train
+        nr_samples_test = d1_test
+
+        flatten_train = d2_train*d3_train*d4_train
+        flatten_test = d2_test*d3_test*d4_test
+
+        x_data_reshaped = train_x.reshape(nr_samples_train, flatten_train)
+        x_test_reshaped = test_x.reshape(nr_samples_test, flatten_test)
+
+        normalized_x_train = self.normalize(x_data_reshaped)
+        normalized_x_test = self.normalize(x_test_reshaped)
+
+        y_0_10_train = self.transform_label_10_to_0(train['y'])
+        y_0_10_test = self.transform_label_10_to_0(test['y'])
+
+        y_train = tf.keras.utils.to_categorical(y_0_10_train)
+        y_test = tf.keras.utils.to_categorical(y_0_10_test)
+        return normalized_x_train, \
                 y_train,\
-                x_test_reshaped, y_test
+                normalized_x_test, y_test
 
 

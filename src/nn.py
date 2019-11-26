@@ -1,12 +1,15 @@
 import sys
 import pandas as pd
+import time
 import numpy as np
+from tqdm import tqdm
 import auto_diff as auto_diff
 import sklearn
 from sympy import *
 from scipy.stats import truncnorm
 from layers import BaseLayer, InputLayer, OutputLayer, HiddenLayer
 from activations import CostFunction
+import utils
 
 
 class Network:
@@ -92,15 +95,17 @@ class Network:
         targets_input = np.array_split(targets, batch_size)
         out_net = []
         i = 0
-        for (batch_in, target_in) in zip(batches_input, targets_input):
-            if i % 100 == 0:
-                print(f'samp:{i}')
-            if eval:
-                out = self.run_forward(batch_in, target_in)
-                out_net.append(out)
-            else:
-                self.train(batch_in, target_in)
-            i += 1
+        total = min(len(batches_input), len(targets_input))
+
+        with tqdm(total=total) as pbar:
+            for (batch_in, target_in) in zip(batches_input, targets_input):
+                if eval:
+                    out = self.run_forward(batch_in, target_in)
+                    out_net.append(out)
+                else:
+                    self.train(batch_in, target_in)
+                i += 1
+                pbar.update(1)
         return out_net
 
     def run_forward(self, data_x, target):
@@ -120,6 +125,7 @@ class Network:
                       batch_size=1, nr_epochs=10,
                       online=True
                       ):
+
         for epoch in range(nr_epochs):
             print("epoch: ", epoch)
             batch_size_train = batch_size

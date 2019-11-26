@@ -132,16 +132,15 @@ def run_mnist_test():
     mnist_x_train, mnist_y_train, mnist_x_test, mnist_y_test = load_mnist_keras()
     neural_network_mnist = nn.Network(bias=True,
                                       shape_in=pd.DataFrame(mnist_x_train).shape).init_network() \
-        .add_layer(256, activation='relu')\
-        .add_layer(layer=layers.DropoutLayer(dropout_prob=0.5, nr_neurons=256)) \
-        .add_layer(256, activation='relu')\
-        .add_layer(layer=layers.DropoutLayer(dropout_prob=0.5, nr_neurons=256)) \
+        .add_layer(200, activation='relu')\
+        .add_layer(layer=layers.DropoutLayer(dropout_prob=0.4, nr_neurons=200)) \
+        .add_layer(200, activation='relu')\
         .add_output(mnist_y_train.shape, 'softmax', 'categorical_cross_entropy')
     neural_network_mnist.train_network(mnist_x_train,
                                        mnist_y_train,
                                        mnist_x_test, mnist_y_test,
-                                       online=True,
-                                       nr_epochs=1, batch_size=len(mnist_x_train))
+                                       online=False,
+                                       nr_epochs=1, batch_size=1000)
     return
 
 
@@ -149,14 +148,15 @@ def run_svhn_test():
    data_loader = dp.DataLoader()
 
    neural_network_svhn = nn.Network(bias=True, shape_in=pd.DataFrame(data_loader.train_x).shape).init_network() \
-       .add_layer(100, activation='sigmoid') \
-       .add_layer(32, activation='sigmoid') \
+       .add_layer(200, activation='relu') \
+       .add_layer(layer=layers.DropoutLayer(0.4, 200)) \
+       .add_layer(200, activation='relu') \
        .add_output(data_loader.train_y.shape, 'softmax', 'categorical_cross_entropy')
    neural_network_svhn.train_network(data_loader.train_x,
                                      data_loader.train_y,
                                      data_loader.test_x, data_loader.test_y,
-                                     online=False,
-                                     nr_epochs=1, batch_size=1000)
+                                     online=True,
+                                     nr_epochs=1, batch_size=len(data_loader.train_x))
    return
 
 
@@ -183,10 +183,10 @@ def run_compute_check():
 
 
 def main():
-    run_mnist_test()
+    #run_mnist_test()
     #run_iris_test()
     #run_compute_check()
-    #run_svhn_test()
+    run_svhn_test()
 
 
 if __name__ == '__main__':

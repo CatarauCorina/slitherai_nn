@@ -76,7 +76,7 @@ class BaseLayer:
             return learning_rate*self.alpha_regularization*self.data
         return 0
 
-    def update_weights(self, learning_rate=0.0001):
+    def update_weights(self, learning_rate=0.01):
         self.data = self.data - (self.get_regularization_term(learning_rate)) - learning_rate*self.crt_err_gradient
         if self.bias_gradient is not None:
             self.bias_data = self.bias_data - learning_rate*self.bias_gradient
