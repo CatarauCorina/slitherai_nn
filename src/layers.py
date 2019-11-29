@@ -91,7 +91,7 @@ class BaseLayer:
 
     def compute_backward_pass(self, learning_rate=0.01):
         if self.activation_type == 'softmax':
-            derivative_output = np.array(self.derivative, ndmin=2).reshape(self.out.shape)
+            derivative_output = self.derivative
         else:
             vars = [auto_diff.Var(name="x", value=x) for x in flatten(self.z_out)]
             derivative_output = np.array(
@@ -100,11 +100,13 @@ class BaseLayer:
             ).reshape(self.out.shape)
 
         if self.next_layer is None:
-            error_gradient_out = self.compute_error_gradient() * derivative_output
+            error_gradient_out = np.dot(derivative_output, self.compute_error_gradient().T).T
+            # if self.activation_type == 'softmax':
+            #     error_gradient_out = np.array(np.sum(error_gradient_out, axis=1), ndmin=2)
             self.crt_err_gradient = np.dot(error_gradient_out.T, self.prev_layer.out)
             self.chain_gradient = np.dot(error_gradient_out, self.data)
             self.update_weights(learning_rate)
-            self.prev_layer.compute_backward_pass()
+            self.prev_layer.compute_backward_pass(learning_rate)
             # print('--------')
             # print(self.crt_err_gradient)
             # print('--------')
@@ -114,7 +116,7 @@ class BaseLayer:
             self.crt_err_gradient = np.dot(error_gradient_hidden.T, self.prev_layer.out)
             self.chain_gradient = np.dot(error_gradient_hidden, self.data)
             self.update_weights(learning_rate)
-            self.prev_layer.compute_backward_pass()
+            self.prev_layer.compute_backward_pass(learning_rate)
             # print('--------')
             # print(self.crt_err_gradient)
             # print('--------')

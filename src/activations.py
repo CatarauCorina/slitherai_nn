@@ -35,18 +35,26 @@ class ActivationFunction:
         if nr_values == 1:
             softmax_sample = self.softmax_sample(x_arr)
             output = np.array(
-                softmax_sample['out'],
+                softmax_sample,
                 ndmin=2
             ).reshape(x_arr.shape)
             self.output = output
-            layer.derivative = np.array(softmax_sample['deriv']).reshape(x_arr.shape)
+            jacobian_softmax = self.softmax_gradient(output)
+            layer.derivative = jacobian_softmax
         else:
             lambda_soft = [self.softmax_sample(np.array(x, ndmin=2)) for x in x_arr]
-            lambda_result = pd.DataFrame(lambda_soft)
-            self.output = np.array(lambda_result['out'].to_list()).reshape(x_arr.shape)
-            layer.derivative = np.array(lambda_result['deriv'].to_list()).reshape(x_arr.shape)
+            lambda_result = np.array(lambda_soft.to_list()).reshape(x_arr.shape)
+            self.output = lambda_result
+            jacobians = [self.softmax_gradient(softmax_activ) for softmax_activ in np.array(lambda_soft.to_list())]
+            layer.derivative = jacobians
 
         return
+
+    def softmax_gradient(self, arr):
+        arr_softmax_activ = arr.reshape(-1, 1)
+        jacob_softmax = np.diagflat(arr_softmax_activ) - np.dot(arr_softmax_activ, arr_softmax_activ.T)
+        return jacob_softmax
+
 
     def softmax_sample(self, x_arr):
         x_flatten = flatten(x_arr)
@@ -54,11 +62,11 @@ class ActivationFunction:
         x_arr_var = [auto_diff.Var(name=f'x_{i}', value=float(stable_softmax[i])) for i in range(len(stable_softmax))]
         exp_arr = [auto_diff.Exponential(var) for var in x_arr_var]
         sum_denominator = reduce(lambda x, y: auto_diff.Add(x, y), exp_arr)
-        softmax_results = [self.function(x, sum_denominator, activation) for (x, activation) in zip(exp_arr, x_arr_var)]
+        softmax_results = [self.function(x, sum_denominator, x_arr_var) for x in exp_arr]
         softmax_forward = [softmax_result[0] for softmax_result in softmax_results]
         softmax_back = [softmax_result[1] for softmax_result in softmax_results]
 
-        return {'out': softmax_forward, 'deriv': softmax_back}
+        return softmax_forward
 
     def softmax_stabilizer(self, x_arr):
         max_x_arr = np.max(x_arr)
@@ -81,9 +89,11 @@ class ActivationFunction:
         self.gradient = f'{sigmoid_func}.gradient({{0}})'
         return sigmoid_func
 
-    def softmax(self, val, sum_denominator, activation_derivative):
+    def softmax(self, val, sum_denominator, activation_derivatives):
         softmax_func = auto_diff.Div(val, sum_denominator).eval()
-        softmax_result_gradient = auto_diff.Div(val, sum_denominator).gradient(activation_derivative).eval()
+
+        softmax_result_gradient = [auto_diff.Div(val, sum_denominator).gradient(activation_derivative).eval()
+                                   for activation_derivative in activation_derivatives]
         return softmax_func, softmax_result_gradient
 
     def relu(self, value=0):
@@ -131,5 +141,8 @@ class CostFunction:
         sum_ce = reduce(lambda x, y: auto_diff.Add(x, y), prod_target_predicted)
         sum_ce = auto_diff.Mul(auto_diff.Constant(-1), sum_ce)
         cost = predicted - target
+        # cost = np.array([sum_ce.gradient(pred_var).eval() for pred_var in predicted_var]).reshape(
+        #     predicted.shape
+        # )
 
         return {'error': sum_ce.eval(), 'derivative_error': cost}

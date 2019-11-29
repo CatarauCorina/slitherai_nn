@@ -14,7 +14,9 @@ def construct_net(input_shape, output_shape):
 
     # The input layer requires the special input_shape parameter which should match
     # the shape of our training data.
-    model.add(ks.layers.Dense(32, input_dim=input_shape, activation='sigmoid'))
+    model.add(ks.layers.Dense(10, input_dim=input_shape, activation='relu'))
+
+
     model.add(ks.layers.Dense(output_shape, activation='softmax'))
 
     #
@@ -26,9 +28,8 @@ def construct_net(input_shape, output_shape):
 def construct_net_svhn(input_shape, output_shape):
     model = ks.Sequential()
 
-    model.add(ks.layers.Dense(200, input_dim=input_shape, activation='relu'))
-    model.add(ks.layers.Dropout(rate=0.4))
-    model.add(ks.layers.Dense(200, activation='relu'))
+    model.add(ks.layers.Dense(20, input_dim=input_shape, activation='relu'))
+    model.add(ks.layers.Dense(10, activation='relu'))
 
     model.add(ks.layers.Dense(output_shape, activation='softmax'))
 
@@ -38,9 +39,9 @@ def construct_net_svhn(input_shape, output_shape):
 def run_svhn_test():
     data_loader = dp.DataLoader()
     model_net = construct_net_svhn(data_loader.train_x.shape[1], data_loader.train_y.shape[1])
-    sgd = tf.keras.optimizers.SGD(lr=0.01)
+    sgd = tf.keras.optimizers.SGD(lr=0.1)
     model_net.compile(optimizer=sgd, loss='categorical_crossentropy', metrics=['accuracy'])
-    history = model_net.fit(data_loader.train_x, data_loader.train_y, epochs=10, verbose=True)
+    history = model_net.fit(data_loader.train_x, data_loader.train_y, epochs=1, verbose=True)
     loss, accuracy = model_net.evaluate(data_loader.test_x, data_loader.test_y, verbose=False)
     model_net.summary()
     print(loss)
@@ -119,10 +120,10 @@ def run_iris_test_keras():
     targets_test = np.array(y_test, ndmin=2).T
     one_hot_test_y = one_hot(targets_test)
     model_net = construct_net(x_train.shape[1], one_hot_train_y.shape[1])
-    sgd = tf.keras.optimizers.SGD(lr=0.001)
+    sgd = tf.keras.optimizers.SGD(lr=0.01)
 
-    model_net.compile(optimizer=sgd, loss='mean_squared_error', metrics=['accuracy'])
-    model_net.fit(x_train, one_hot_train_y, epochs=200, verbose=True)
+    model_net.compile(optimizer=sgd, loss='categorical_crossentropy', metrics=['accuracy'])
+    model_net.fit(x_train, one_hot_train_y, epochs=5, verbose=True)
     loss, accuracy = model_net.evaluate(x_test, one_hot_test_y, verbose=False)
     model_net.summary()
     print(loss)

@@ -28,8 +28,8 @@ class DataLoader:
         return np.array(normalized_images)
 
     def load_svhn_data(self):
-        train = scipy.io.loadmat('./src/data/train_32x32.mat')
-        test = scipy.io.loadmat('./src/data/test_32x32.mat')
+        train = scipy.io.loadmat('./data/train_32x32.mat')
+        test = scipy.io.loadmat('./data/test_32x32.mat')
         train_x = np.moveaxis(train['X'], -1, 0)
         test_x = np.moveaxis(test['X'], -1, 0)
         d1_train, d2_train, d3_train, d4_train = train_x.shape

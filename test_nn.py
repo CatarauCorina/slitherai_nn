@@ -121,9 +121,9 @@ def run_iris_test():
     targets_test = np.array(y_test, ndmin=2).T
     one_hot_test_y = one_hot(targets_test)
     neural_network_test = nn.Network(bias=True, shape_in=pd.DataFrame(x_train).shape).init_network() \
-        .add_layer(8, init_type='random', activation='sigmoid')\
+        .add_layer(10, init_type='random', activation='relu') \
         .add_output(one_hot_train_y.shape, init_type='random', activation='softmax', cost_function='categorical_cross_entropy')
-    neural_network_test.train_network(x_train, one_hot_train_y, x_test, one_hot_test_y, nr_epochs=300, batch_size=len(x_train))
+    neural_network_test.train_network(x_train, one_hot_train_y, x_test, one_hot_test_y, nr_epochs=100, batch_size=len(x_train))
     return
 
 
@@ -148,14 +148,14 @@ def run_svhn_test():
    data_loader = dp.DataLoader()
 
    neural_network_svhn = nn.Network(bias=True, shape_in=pd.DataFrame(data_loader.train_x).shape).init_network() \
-       .add_layer(200, activation='relu') \
-       .add_layer(layer=layers.DropoutLayer(0.4, 200)) \
-       .add_layer(200, activation='relu') \
+       .add_layer(20, activation='relu') \
+       .add_layer(10, activation='relu') \
        .add_output(data_loader.train_y.shape, 'softmax', 'categorical_cross_entropy')
    neural_network_svhn.train_network(data_loader.train_x,
                                      data_loader.train_y,
                                      data_loader.test_x, data_loader.test_y,
                                      online=True,
+                                     learning_rate=0.1,
                                      nr_epochs=1, batch_size=len(data_loader.train_x))
    return
 
@@ -184,9 +184,9 @@ def run_compute_check():
 
 def main():
     #run_mnist_test()
-    #run_iris_test()
+    run_iris_test()
     #run_compute_check()
-    run_svhn_test()
+    #run_svhn_test()
 
 
 if __name__ == '__main__':

@@ -69,7 +69,7 @@ class Network:
                    alpha_regularization=0):
         layer_out = OutputLayer(
             None,
-            self.crt_layer, self.bias,
+            self.crt_layer, None,
             shape=target_shape,
             activation=activation,
             cost_function=cost_function,
@@ -90,11 +90,12 @@ class Network:
         errors = [eval(cost.derivative_cost) for (predicted, target) in zip(self.network_out, self.output_data)]
         self.grad['error'] = {'out': errors}
 
-    def run_batch(self, data, targets, batch_size=1, eval=False):
+    def run_batch(self, data, targets, batch_size=1, learning_rate=0.01, eval=False):
         batches_input = np.array_split(data, batch_size)
         targets_input = np.array_split(targets, batch_size)
         out_net = []
         i = 0
+        print(len(batches_input[0]))
         total = min(len(batches_input), len(targets_input))
 
         with tqdm(total=total) as pbar:
@@ -103,7 +104,7 @@ class Network:
                     out = self.run_forward(batch_in, target_in)
                     out_net.append(out)
                 else:
-                    self.train(batch_in, target_in)
+                    self.train(batch_in, target_in, learning_rate=learning_rate)
                 i += 1
                 pbar.update(1)
         return out_net
@@ -123,7 +124,8 @@ class Network:
     def train_network(self, data_train, targets_train,
                       data_test, targets_test,
                       batch_size=1, nr_epochs=10,
-                      online=True
+                      online=True,
+                      learning_rate=0.01
                       ):
 
         for epoch in range(nr_epochs):
@@ -131,12 +133,13 @@ class Network:
             batch_size_train = batch_size
             if online:
                 batch_size_train = len(data_train)
-            self.run_batch(data_train, targets_train, batch_size_train)
-            for lay in self.layers:
-                print('-----')
-                print(lay.crt_err_gradient)
-                print('-----')
-            print(self.layers[len(self.layers)-1].out)
+            self.run_batch(data_train, targets_train, batch_size_train, learning_rate=learning_rate)
+            # for lay in self.layers:
+            #     print('-----')
+            #     print(lay.crt_err_gradient)
+            #
+            #     print('-----')
+           # print(self.layers[len(self.layers)-1].out)
             print("Eval-train")
             corrects, wrongs = self.evaluate(data_train, targets_train)
             print("accuracy train: ", (corrects / (corrects + wrongs))*100)
