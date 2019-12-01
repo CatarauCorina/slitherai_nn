@@ -2,6 +2,7 @@ import sys
 import pandas as pd
 import time
 import numpy as np
+import pickle
 from tqdm import tqdm
 import auto_diff as auto_diff
 import sklearn
@@ -9,6 +10,7 @@ from sympy import *
 from scipy.stats import truncnorm
 from layers import BaseLayer, InputLayer, OutputLayer, HiddenLayer
 from activations import CostFunction
+from plotter import Plotter
 import utils
 
 
@@ -36,12 +38,15 @@ class Network:
         self.grad = {}
         self.shape_in = shape_in
         self.regularization = regularization
+        self.plotter = None
         return
 
-    def init_network(self, activation_in='relu', alpha_regularization=0):
+    def init_network(self, activation_in='relu', alpha_regularization=0, save_plot_values=False):
         layer_in = InputLayer(self.input_data, self.bias, self.shape_in, activation_in,
                               alpha_regularization,
                               regularization_type=self.regularization)
+        if save_plot_values:
+            self.plotter = Plotter()
         self.crt_layer = layer_in
         self.layers.append(layer_in)
         return self
@@ -69,9 +74,10 @@ class Network:
                    alpha_regularization=0):
         layer_out = OutputLayer(
             None,
-            self.crt_layer, None,
+            self.crt_layer, self.bias,
             shape=target_shape,
             activation=activation,
+            init_type=init_type,
             cost_function=cost_function,
             regularization_type=self.regularization,
             alpha_regularization=alpha_regularization
@@ -104,20 +110,22 @@ class Network:
                     out = self.run_forward(batch_in, target_in)
                     out_net.append(out)
                 else:
-                    self.train(batch_in, target_in, learning_rate=learning_rate)
+                    self.train(batch_in, target_in, learning_rate=learning_rate, iteration=i)
                 i += 1
                 pbar.update(1)
         return out_net
 
-    def run_forward(self, data_x, target):
+    def run_forward(self, data_x, target, plotter=None):
         self.layers[0].data = data_x
         self.layers[len(self.layers)-1].target_values = target
-
-        network_output = self.crt_layer.compute_forward_pass()
+        #network_output = self.crt_layer.compute_forward_pass(plotter)
+        network_output = self.layers[0].compute_forward_pass_v2()
         return network_output
 
-    def train(self, data_x, target, learning_rate=0.001):
-        self.run_forward(data_x, target)
+    def train(self, data_x, target, iteration, learning_rate=0.001):
+        out = self.run_forward(data_x, target, self.plotter)
+        if self.plotter:
+            self.plotter.add_out_prob(iteration, out)
         self.crt_layer.compute_backward_pass(learning_rate)
         return
 
@@ -125,7 +133,7 @@ class Network:
                       data_test, targets_test,
                       batch_size=1, nr_epochs=10,
                       online=True,
-                      learning_rate=0.01
+                      learning_rate=0.01,
                       ):
 
         for epoch in range(nr_epochs):
@@ -140,12 +148,28 @@ class Network:
             #
             #     print('-----')
            # print(self.layers[len(self.layers)-1].out)
+
             print("Eval-train")
             corrects, wrongs = self.evaluate(data_train, targets_train)
             print("accuracy train: ", (corrects / (corrects + wrongs))*100)
             print("Eval-test")
             corrects, wrongs = self.evaluate(data_test, targets_test)
             print("accuracy: test", (corrects / (corrects + wrongs))*100)
+        nr_neurons = ','.join([str(lay['nr_neurons']) for lay in self.layers])
+        model_name = str(f'net_lay={len(self.layers)}_ne={nr_neurons}_lr={learning_rate}.obj')
+        filehandler = open(model_name, 'wb')
+        pickle.dump(self, filehandler)
+        return
+
+    def load_model_from_checkpoint(self, file_name):
+        save_model = open(file_name, 'rb')
+        nn = pickle.load(save_model)
+        return nn
+
+    def evaluate_saved(self, test_input, test_output):
+        corrects, wrongs = self.evaluate(test_input, test_output)
+        print("accuracy: test", (corrects / (corrects + wrongs)) * 100)
+        return
 
     def evaluate(self, test_input, test_output):
         out = self.run_batch(test_input, test_output, batch_size=len(test_input), eval=True)

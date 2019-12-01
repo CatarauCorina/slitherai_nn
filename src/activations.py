@@ -43,9 +43,9 @@ class ActivationFunction:
             layer.derivative = jacobian_softmax
         else:
             lambda_soft = [self.softmax_sample(np.array(x, ndmin=2)) for x in x_arr]
-            lambda_result = np.array(lambda_soft.to_list()).reshape(x_arr.shape)
+            lambda_result = np.array(lambda_soft).reshape(x_arr.shape)
             self.output = lambda_result
-            jacobians = [self.softmax_gradient(softmax_activ) for softmax_activ in np.array(lambda_soft.to_list())]
+            jacobians = [self.softmax_gradient(softmax_activ) for softmax_activ in np.array(lambda_soft)]
             layer.derivative = jacobians
 
         return

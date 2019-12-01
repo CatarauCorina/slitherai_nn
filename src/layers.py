@@ -5,6 +5,7 @@ import sklearn
 from sympy import *
 from scipy.stats import truncnorm
 from activations import ActivationFunction, CostFunction
+from plotter import Plotter
 
 
 class BaseLayer:
@@ -42,7 +43,7 @@ class BaseLayer:
         self.alpha_regularization = alpha_regularization
         return
 
-    def compute_forward_pass(self):
+    def compute_forward_pass(self, plotter=None):
         if not self.prev_layer:
             self.out = self.data
             # print('----------')
@@ -52,14 +53,27 @@ class BaseLayer:
 
             return self.data
         else:
-            self.z_out = np.dot(self.prev_layer.compute_forward_pass(), self.data.T) + self.bias_data
+            self.z_out = np.dot(self.prev_layer.compute_forward_pass(plotter), self.data.T) + self.bias_data
             self.out = ActivationFunction(self.z_out, self.activation_type, layer=self).output
+            if plotter:
+                plotter.add_activation(self.z_out, f'{self.activation_type}_{self.nr_neurons}')
             # print('----------')
             # print(self)
             # print(self.data)
             # print(self.out)
             # print('----------')
             return self.out
+
+    def compute_forward_pass_v2(self):
+        if not self.prev_layer:
+            self.out = self.data
+        else:
+            self.z_out = np.dot(self.prev_layer.out, self.data.T) + self.bias_data
+            self.out = ActivationFunction(self.z_out, self.activation_type, layer=self).output
+        if self.next_layer is None:
+            return self.out
+        else:
+            return self.next_layer.compute_forward_pass_v2()
 
     def compute_error_gradient(self):
         cost = CostFunction(self.out, self.target_values, name=self.cost_function)
@@ -89,6 +103,9 @@ class BaseLayer:
             return bias_gradient
         return error_gradient
 
+    def cross_entropy_with_softmax(self):
+        return self.out - self.target_values
+
     def compute_backward_pass(self, learning_rate=0.01):
         if self.activation_type == 'softmax':
             derivative_output = self.derivative
@@ -100,11 +117,16 @@ class BaseLayer:
             ).reshape(self.out.shape)
 
         if self.next_layer is None:
-            error_gradient_out = np.dot(derivative_output, self.compute_error_gradient().T).T
-            # if self.activation_type == 'softmax':
-            #     error_gradient_out = np.array(np.sum(error_gradient_out, axis=1), ndmin=2)
+            # error_gradient_out = np.dot(derivative_output, self.compute_error_gradient().T).T
+            error_gradient_out = self.compute_error_gradient()*derivative_output
+            if self.activation_type == 'softmax':
+                error_gradient_out = self.cross_entropy_with_softmax()
+                # error_gradient_out = np.array(np.sum(error_gradient_out, axis=1), ndmin=2)
             self.crt_err_gradient = np.dot(error_gradient_out.T, self.prev_layer.out)
             self.chain_gradient = np.dot(error_gradient_out, self.data)
+            if error_gradient_out.shape[0] > 1:
+                self.crt_err_gradient = self.crt_err_gradient/error_gradient_out.shape[0]
+                self.chain_gradient = self.chain_gradient/error_gradient_out.shape[0]
             self.update_weights(learning_rate)
             self.prev_layer.compute_backward_pass(learning_rate)
             # print('--------')
@@ -176,8 +198,16 @@ class HiddenLayer(BaseLayer):
             (low - mean) / sd, (upp - mean) / sd, loc=mean, scale=sd)
 
     def debug_init(self, prev_layer_neurons, nr_neurons):
-        arr = np.arange(prev_layer_neurons*nr_neurons)
-        return arr.reshape(nr_neurons, prev_layer_neurons)
+        weights_h = np.array([[0.15, 0.20], [0.25, 0.30]], ndmin=2)
+        weights_out = np.array([[0.4, 0.45], [0.5, 0.55]], ndmin=2)
+        if type(self) is HiddenLayer:
+            self.bias_data = np.array([0.35, 0.35], ndmin=2)
+            return weights_h
+        elif type(self) is OutputLayer:
+            self.bias_data = np.array([0.6, 0.6], ndmin=2)
+            return weights_out
+        # arr = np.arange(prev_layer_neurons*nr_neurons)
+        # return arr.reshape(nr_neurons, prev_layer_neurons)
 
     def random_init_2(self, prev_layer_neurons, nr_neurons):
         x = self.truncated_normal(
@@ -188,11 +218,11 @@ class HiddenLayer(BaseLayer):
         random_vector = x.rvs((nr_neurons, prev_layer_neurons))
         return random_vector
 
-    def random_init(self, prev_layer_neurons, nr_neurons):
-        return np.random.randn(nr_neurons, prev_layer_neurons)*np.sqrt(2/nr_neurons)
+    def he_init(self, prev_layer_neurons, nr_neurons):
+        return np.random.randn(nr_neurons, prev_layer_neurons)*np.sqrt(2/prev_layer_neurons)
 
     def xavier_init(self, prev_layer_neurons, nr_neurons):
-        return np.random.randn(nr_neurons, prev_layer_neurons) * np.sqrt(1 / (nr_neurons + prev_layer_neurons))
+        return np.random.randn(nr_neurons, prev_layer_neurons) * np.sqrt(1 / prev_layer_neurons)
 
     def bias_init(self):
         bias_vector = np.full((1, self.nr_neurons), 0.1)
@@ -242,13 +272,13 @@ class DropoutLayer(BaseLayer):
         self.mask_dropout = None
         return
 
-    def compute_forward_pass(self):
-        prev_out = self.prev_layer.compute_forward_pass()
+    def compute_forward_pass_v2(self):
+        prev_out = self.prev_layer.out
         self.mask_dropout = np.random.binomial(1, self.dropout_prob, size=prev_out.shape)/self.dropout_prob
         self.out = prev_out * self.mask_dropout
-        return self.out
+        return self.next_layer.compute_forward_pass_v2()
 
-    def compute_backward_pass(self):
+    def compute_backward_pass(self, learning_rate):
         self.chain_gradient = self.next_layer.chain_gradient * self.mask_dropout
-        self.prev_layer.compute_backward_pass()
+        self.prev_layer.compute_backward_pass(learning_rate)
         return

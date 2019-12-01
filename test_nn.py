@@ -5,9 +5,11 @@ import tensorflow as tf
 import sklearn.datasets as ds
 from slitherai_nn.src import layers as layers
 from slitherai_nn.src import nn as nn
+from slitherai_nn.src import grid_search as gd
 from slitherai_nn.src import lab_nn as ln
 from sklearn.model_selection import train_test_split
 import data_preproc as dp
+from slitherai_nn.src import plotter as plt
 
 
 def dummy_data():
@@ -121,9 +123,13 @@ def run_iris_test():
     targets_test = np.array(y_test, ndmin=2).T
     one_hot_test_y = one_hot(targets_test)
     neural_network_test = nn.Network(bias=True, shape_in=pd.DataFrame(x_train).shape).init_network() \
-        .add_layer(10, init_type='random', activation='relu') \
-        .add_output(one_hot_train_y.shape, init_type='random', activation='softmax', cost_function='categorical_cross_entropy')
-    neural_network_test.train_network(x_train, one_hot_train_y, x_test, one_hot_test_y, nr_epochs=100, batch_size=len(x_train))
+        .add_layer(10, init_type='he', activation='relu') \
+        .add_output(one_hot_train_y.shape, init_type='he', activation='softmax', cost_function='categorical_cross_entropy')
+    neural_network_test.train_network(x_train,
+                                      one_hot_train_y,
+                                      x_test, one_hot_test_y,
+                                      online=False,
+                                      nr_epochs=5, batch_size=10)
     return
 
 
@@ -132,10 +138,13 @@ def run_mnist_test():
     mnist_x_train, mnist_y_train, mnist_x_test, mnist_y_test = load_mnist_keras()
     neural_network_mnist = nn.Network(bias=True,
                                       shape_in=pd.DataFrame(mnist_x_train).shape).init_network() \
-        .add_layer(200, activation='relu')\
+        .add_layer(200, activation='relu', init_type='he')\
         .add_layer(layer=layers.DropoutLayer(dropout_prob=0.4, nr_neurons=200)) \
-        .add_layer(200, activation='relu')\
-        .add_output(mnist_y_train.shape, 'softmax', 'categorical_cross_entropy')
+        .add_layer(200, activation='relu', init_type='he')\
+        .add_output(mnist_y_train.shape,
+                    init_type='he',
+                    activation='softmax',
+                    cost_function='categorical_cross_entropy')
     neural_network_mnist.train_network(mnist_x_train,
                                        mnist_y_train,
                                        mnist_x_test, mnist_y_test,
@@ -145,48 +154,68 @@ def run_mnist_test():
 
 
 def run_svhn_test():
+
    data_loader = dp.DataLoader()
 
-   neural_network_svhn = nn.Network(bias=True, shape_in=pd.DataFrame(data_loader.train_x).shape).init_network() \
-       .add_layer(20, activation='relu') \
-       .add_layer(10, activation='relu') \
-       .add_output(data_loader.train_y.shape, 'softmax', 'categorical_cross_entropy')
+   neural_network_svhn = nn.Network(bias=True, shape_in=pd.DataFrame(data_loader.train_x).shape).init_network(
+       save_plot_values=True
+   ) \
+       .add_layer(200, activation='relu', init_type='he') \
+       .add_layer(layer=layers.DropoutLayer(dropout_prob=0.4, nr_neurons=200)) \
+       .add_layer(200, activation='relu', init_type='he') \
+       .add_output(data_loader.train_y.shape, 'softmax', 'categorical_cross_entropy', init_type='he')
    neural_network_svhn.train_network(data_loader.train_x,
                                      data_loader.train_y,
                                      data_loader.test_x, data_loader.test_y,
-                                     online=True,
-                                     learning_rate=0.1,
-                                     nr_epochs=1, batch_size=len(data_loader.train_x))
+                                     online=False,
+                                     learning_rate=0.01,
+                                     nr_epochs=1,
+                                     batch_size=1000)
    return
 
 
 
 
 def run_compute_check():
-    x = [[1, 2, 3], [1, 1, 1]]
+    x = [[0.05, 0.10]]
     x_arr = np.array(x, ndmin=2)
     x_test = [[4, 5, 6], [0, 0, 0]]
     x_arr_test = np.array(x_test, ndmin=2)
-    y = [[0, 1], [1, 0]]
+    y = [[0.01, 0.99]]
     y_test = [[1, 0], [0, 1]]
     y_arr = np.array(y, ndmin=2)
     y_test_arr = np.array(y_test, ndmin=2)
 
     neural_network_debug = nn.Network(bias=True, shape_in=pd.DataFrame(x_arr).shape).init_network() \
         .add_layer(2, init_type='debug', activation='relu') \
-        .add_output(y_arr.shape, activation='softmax', cost_function='categorical_cross_entropy')
+        .add_output(y_arr.shape, init_type='debug', activation='softmax', cost_function='categorical_cross_entropy')
     neural_network_debug.train_network(x_arr,
                                        y_arr,
                                        x_arr_test, y_test_arr,
-                                       nr_epochs=10, batch_size=len(x_arr))
+                                       nr_epochs=1, batch_size=len(x_arr))
+    return
+
+
+def load_and_eval(file_name):
+    network = nn.Network()
+    loaded_model = network.load_model_from_checkpoint(file_name)
+    x_iris, y_iris = ds.load_iris(return_X_y=True)
+    x_train, x_test, y_train, y_test = train_test_split(x_iris, y_iris, test_size=0.1)
+    targets_train = np.array(y_train, ndmin=2).T
+    one_hot_train_y = one_hot(targets_train)
+    targets_test = np.array(y_test, ndmin=2).T
+    one_hot_test_y = one_hot(targets_test)
+    loaded_model.evaluate_saved(x_test, one_hot_test_y)
     return
 
 
 def main():
     #run_mnist_test()
-    run_iris_test()
+    #run_iris_test()
     #run_compute_check()
     #run_svhn_test()
+    #load_and_eval('net_lay=3_lr=0.01.obj')
+    gd.GridSearch('params_experiment.json')
 
 
 if __name__ == '__main__':
